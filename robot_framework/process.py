@@ -9,8 +9,6 @@ import smtplib
 
 def process(orchestrator_connection: OrchestratorConnection| None = None) -> None:
 
-    orchestrator_connection = OrchestratorConnection("Byggesager uden aktivitet", os.getenv('OpenOrchestratorSQL'),os.getenv('OpenOrchestratorKey'), None)
-
     orchestrator_connection.log_info('Starting process Byggersager uden aktivitet -bot')
 
     # Read the SQL query from file
