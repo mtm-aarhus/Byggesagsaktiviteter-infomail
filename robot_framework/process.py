@@ -1,153 +1,131 @@
-"""This module contains the main process of the robot."""
-
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-from OpenOrchestrator.database.queues import QueueElement
 import os
-import pytz
-import requests
-import json
-from datetime import datetime, timedelta  # Samlet relevant datetime-import
+from datetime import datetime
+import pandas as pd
+import pyodbc
+import mimetypes
+from email.message import EmailMessage
+import smtplib
 
-# pylint: disable-next=unused-argument
-def process(orchestrator_connection: OrchestratorConnection, queue_element: QueueElement | None = None) -> None:
-    def GetFilarkivToken(orchestrator_connection: OrchestratorConnection):
+def process(orchestrator_connection: OrchestratorConnection| None = None) -> None:
 
-        try:
-            FilarkivTokenTimestamp = orchestrator_connection.get_constant("FilarkivTokenTimestamp1").value
-            Filarkiv_access= orchestrator_connection.get_credential("FilarkivAccessToken1")
-            Filarkiv_access_token = Filarkiv_access.password
-            Filarkiv_URL = Filarkiv_access.username
-            Filarkiv_client= orchestrator_connection.get_credential("FilarkivClientSecret")
-            client_secret = Filarkiv_client.password
+    orchestrator_connection = OrchestratorConnection("Byggesager uden aktivitet", os.getenv('OpenOrchestratorSQL'),os.getenv('OpenOrchestratorKey'), None)
 
-            # Define Danish timezone
-            danish_timezone = pytz.timezone("Europe/Copenhagen")
+    orchestrator_connection.log_info('Starting process Byggersager uden aktivitet -bot')
 
-            # Parse the old timestamp to a datetime object
-            old_time = datetime.strptime(FilarkivTokenTimestamp.strip(), "%d-%m-%Y %H:%M:%S")
-            old_time = danish_timezone.localize(old_time)  # Localize to Danish timezone
-            print('Old timestamp: ' + old_time.strftime("%d-%m-%Y %H:%M:%S"))
+    # Read the SQL query from file
+    sql_file_path = "SQL LOIS-tabeller 2 - sager med åbne aktiviteter uden startdato.sql"
+    with open(sql_file_path, "r", encoding="utf-8") as file:
+        query = file.read()
 
-            # Get the current timestamp in Danish timezone
-            current_time = datetime.now(danish_timezone)
-            print('current timestamp: '+current_time.strftime("%d-%m-%Y %H:%M:%S"))
-            str_current_time = current_time.strftime("%d-%m-%Y %H:%M:%S")
+    # Database connection setup
+    sql_server = orchestrator_connection.get_constant("SqlServer").value
+    conn_str = 'DRIVER={ODBC Driver 17 for SQL Server};' + f'SERVER={sql_server};DATABASE=LOIS;Trusted_Connection=yes'
+    conn = pyodbc.connect(conn_str)
+    cursor = conn.cursor()
 
-            # Calculate the difference between the two timestamps
-            time_difference = current_time - old_time
-            print(time_difference)
+    # Step 2: Execute the actual SELECT query
+    cursor.execute(query)
 
-            # Check if the difference is over 1 hour and 30 minutes
-            GetNewTimeStamp = time_difference > timedelta(minutes=30)
+    # Step 3: Fetch results
+    rows = cursor.fetchall()
+    orchestrator_connection.log_info(f'rows {rows}')
 
-            # Output for the boolean
-            print("GetNewTimeStamp:", GetNewTimeStamp)
+    # Step 4: Load the data into a Pandas DataFrame
+    data = pd.read_sql(query, conn)
 
-            # Example of using it in an if-statement
-            if GetNewTimeStamp:
-                print("The difference is over 30 minutes. Fetch a new timestamp!")
-                # Replace these values with your actual keys
-                client_id = 'fa_de_aarhus_job_user'
-                scope = 'fa_de_api:normal'
-                grant_type = 'client_credentials'
+    # Step 5: Close database connection
+    cursor.close()
+    conn.close()
 
-                # Data to be sent in the POST request
-                keys = {
-                    'client_secret': client_secret,
-                    'client_id': client_id,
-                    'scope': scope,
-                    'grant_type': grant_type,  # Specify the grant type you're using
-                }
+    ExcelFileName = f"{datetime.today().strftime('%Y%m%d')} Sager uden aktivitet eller kun med tidsbegrænsede aktiviteter.xlsx"
+    excel_file_path = os.path.join(os.getcwd(), ExcelFileName)
 
-                try:
-                    # Sending POST request to get the access token
-                    response = requests.post(Filarkiv_URL, data=keys)
-                    response.raise_for_status()
-                except requests.exceptions.RequestException as e:
-                    raise ConnectionError(f"Failed to fetch new access token: {e}")
-                
-                # Extract access token
-                Filarkiv_access_token = response.json().get('access_token')
-                if not Filarkiv_access_token:
-                    raise RuntimeError("Access token not found in response.")
+    # Sørg for at 'Sagsdato' er i datetime-format
+    if "Sagsdato" in data.columns:
+        data["Sagsdato"] = pd.to_datetime(data["Sagsdato"], errors='coerce')
 
-                print("Access token granted successfully.")
+    with pd.ExcelWriter(excel_file_path, engine='xlsxwriter', datetime_format='dd-mm-yyyy') as writer:
+        data.to_excel(writer, sheet_name='Ark1', index=False)
 
-                # Update credentials and timestamp in the orchestrator
-                orchestrator_connection.update_credential("FilarkivAccessToken1", Filarkiv_URL, Filarkiv_access_token)
-                orchestrator_connection.update_constant("FilarkivTokenTimestamp1", current_time.strftime("%d-%m-%Y %H:%M:%S"))
+        workbook  = writer.book
+        worksheet = writer.sheets['Ark1']
 
-                return Filarkiv_access_token
+        # Lav Excel-tabel over hele området
+        (max_row, max_col) = data.shape
+        col_range = chr(65 + max_col - 1)
+        table_range = f"A1:{col_range}{max_row + 1}"
 
-            else:
-                print("No need to fetch a new token. Using existing one.")
-                return Filarkiv_access_token
+        worksheet.add_table(table_range, {
+            'name': 'Byggesager_uden_aktiviteter',
+            'columns': [{'header': col} for col in data.columns]
+        })
 
-        except Exception as e:
-            raise RuntimeError(f"An error occurred in GetFilarkivToken: {e}")
+        # Excel-datoformat
+        date_format = workbook.add_format({'num_format': 'dd-mm-yyyy'})
 
-    def GetFileID(CaseID):
-        Filarkiv_access_token = GetFilarkivToken(orchestrator_connection)
+        # Kolonnebredde og formatering
+        for i, column in enumerate(data.columns):
+            column_length = max(data[column].astype(str).map(len).max(), len(column))
+            fmt = date_format if column == "Sagsdato" else None
+            worksheet.set_column(i, i, column_length + 2, fmt)
 
-        url = f"https://core.filarkiv.dk/api/v1/Documents"
-        params = {
-            "caseid": CaseID,
-            "expand": "Files"
-        }
-        response = requests.get(url, headers={"Authorization": f"Bearer {Filarkiv_access_token}", "Content-Type": "application/json"}, params = params)
-        if response.status_code in [200, 201]:
-            print("FilID'er henter")
-        else:
-            print("Fejl i henting af fil-id'er:", response.text)
-        
-        response_json = response.json()
-        file_ids = []
 
-        for document in response_json:
-            files = document.get("files", [])
-            for file_entry in files:
-                file_id = file_entry.get("id")
-                if file_id:
-                    file_ids.append(file_id)
+    # SMTP Configuration
+    SMTP_SERVER = "smtp.adm.aarhuskommune.dk"
+    SMTP_PORT = 25
+    SCREENSHOT_SENDER = "byggesager@aarhus.dk"
+    subject = f"Byggesager uden aktiviteter"
 
-        return file_ids
-        
-    def DeleteFromFilarkiv(CaseID, Filarkiv_access_token ):
-        Filarkiv_access_token = GetFilarkivToken(orchestrator_connection)
+    # Email body (HTML)
+    body = f"""
+    <html>
+        <body>
+            <p>Hej Anne 😊,</p>
+            <br>
+            <p>Her er excelarket med byggesager uden aktiviteter eller med tidsbegrænsede aktiviteter</p>
+            <br>
+            <p>Med venlig hilsen</p>
+            <br>
+            <p>Teknik og Miljø</p>
+            <p>Digitalisering</p>
+            <p>Aarhus Kommune</p>
+        </body>
+    </html>
+    """
 
-        url = f"https://core.filarkiv.dk/api/v1/Cases" 
+    # Hent mailadresse fra Orchestrator
+    UdviklerMail = orchestrator_connection.get_constant('balas').value
 
-        data = {
-                "id": CaseID,
-        }
-        response = requests.delete(url, headers={"Authorization": f"Bearer {Filarkiv_access_token}", "Content-Type": "application/json"}, data=json.dumps(data))
-        if response.status_code in [200, 201, 204]:
-            print("Sagen er slettet")
-        else:
-            print("Fejl i sletning af sagen:", response.text)
+    # Opret besked
+    msg = EmailMessage()
+    msg['To'] = UdviklerMail
+    msg['From'] = SCREENSHOT_SENDER
+    msg['Subject'] = subject
+    msg.set_content("Please enable HTML to view this message.")
+    msg.add_alternative(body, subtype='html')
+    msg['Reply-To'] = UdviklerMail
+    msg['Bcc'] = UdviklerMail
 
-    def PostFileIDtoEndPoint(API_params, FileIDs):
-        url = f'{API_params.username}/Jobs/QueueFilArkivFilesForDeletion'
-        key = API_params.password
-        Filarkiv_access_token = GetFilarkivToken(orchestrator_connection)
+    # Vedhæft Excel-fil
+    try:
+        with open(excel_file_path, 'rb') as f:
+            file_data = f.read()
+            file_name = os.path.basename(excel_file_path)
+            mime_type, _ = mimetypes.guess_type(excel_file_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
 
-        headers = {
-            "Authorization": f"Bearer {Filarkiv_access_token}", 
-            "ApiKey": key
-            }
-        payload = {
-            "files": FileIDs
-            }
-        response = requests.post(url, headers= headers, json=payload)
-        print(response.status_code)
-        if response.status_code in [200, 201, 204]:
-            print("FilID'er henter")
-        else:
-            print("Fejl i henting af fil-id'er:", response.text)
-    queue_json = json.loads(queue_element.data)
-    CaseID = queue_json.get('FileID')
-    Token = GetFilarkivToken(orchestrator_connection)
-    API_params = orchestrator_connection.get_credential('AktbobAPIKey')
-    FileIDs = GetFileID(CaseID)
-    PostFileIDtoEndPoint(API_params, FileIDs)
-    DeleteFromFilarkiv(CaseID=CaseID, Filarkiv_access_token= Token)
+            msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=file_name)
+    except Exception as e:
+        orchestrator_connection.log_info(f"Fejl under vedhæftning af fil: {e}")
+
+    # Send mail
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+            smtp.send_message(msg)
+    except Exception as e:
+        orchestrator_connection.log_info(f"Failed to send byggesagsemail: {e}")
+
+
+    if os.path.exists(excel_file_path):
+        os.remove(excel_file_path)

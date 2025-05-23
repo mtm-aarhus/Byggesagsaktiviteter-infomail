@@ -6,7 +6,6 @@
 import sys
 
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-
 from robot_framework import initialize
 from robot_framework import reset
 from robot_framework.exceptions import BusinessError, handle_error, log_exception

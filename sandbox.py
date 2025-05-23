@@ -1,16 +1,8 @@
 from OpenOrchestrator.orchestrator_connection.connection import OrchestratorConnection
-from OpenOrchestrator.database.queues import QueueElement
 import os
-from datetime import datetime, timedelta
-import locale
+from datetime import datetime
 import pandas as pd
 import pyodbc
-from openpyxl import Workbook
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import numbers
-from openpyxl.styles import NamedStyle
-import xlsxwriter
 import mimetypes
 from email.message import EmailMessage
 import smtplib
