@@ -94,10 +94,11 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
 
     # Hent mailadresse fra Orchestrator
     UdviklerMail = orchestrator_connection.get_constant('balas').value
+    ModtagerMail = orchestrator_connection.get_constant('AnneKVMail').value
 
     # Opret besked
     msg = EmailMessage()
-    msg['To'] = UdviklerMail
+    msg['To'] = ModtagerMail
     msg['From'] = SCREENSHOT_SENDER
     msg['Subject'] = subject
     msg.set_content("Please enable HTML to view this message.")
