@@ -79,7 +79,7 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
     body = f"""
     <html>
         <body>
-            <p>Hej Anne 😊,</p>
+            <p>Hej Pia og Louise 😊,</p>
             <br>
             <p>Her er excelarket med byggesager uden aktiviteter eller med tidsbegrænsede aktiviteter</p>
             <br>
@@ -94,11 +94,12 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
 
     # Hent mailadresse fra Orchestrator
     UdviklerMail = orchestrator_connection.get_constant('balas').value
-    ModtagerMail = orchestrator_connection.get_constant('AnneKVMail').value
+    ModtagerMail = orchestrator_connection.get_constant('PiaNoddeboMail').value
+    ModtagerMail2 = orchestrator_connection.get_constant('LouiseRasmussenMail').value
 
     # Opret besked
     msg = EmailMessage()
-    msg['To'] = ModtagerMail
+    msg['To'] = ", ".join([ModtagerMail, ModtagerMail2])
     msg['From'] = SCREENSHOT_SENDER
     msg['Subject'] = subject
     msg.set_content("Please enable HTML to view this message.")
