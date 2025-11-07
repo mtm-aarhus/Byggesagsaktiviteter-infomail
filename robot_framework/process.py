@@ -100,7 +100,7 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
     # Opret besked
     msg = EmailMessage()
     # msg['To'] = ", ".join([ModtagerMail, ModtagerMail2])
-    msg['To] = UdviklerMail
+    msg['To'] = UdviklerMail
     msg['From'] = SCREENSHOT_SENDER
     msg['Subject'] = subject
     msg.set_content("Please enable HTML to view this message.")
