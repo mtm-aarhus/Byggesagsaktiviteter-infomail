@@ -21,69 +21,32 @@ FROM
 			inner join Service_NOVA2.LIS_Byg_info info2 ON sager2.SagsUUID = info2.SagsUUID
 			left join Service_NOVA2.LIS_Byg_Opgaver opgaver on sager2.SagsUUID = opgaver.SagsUUID
 		where
-			-- frav�lg sager med status "afsluttet"
 			sager2.Tilstand not in ('Afsluttet')
-
-			-- frav�lg sager hvor afslutningsdato er sat
 			AND info2.AfslutningsDato is null
-
-			-- frav�lg sager hvor ordet "skabelon" indg�r i sagsnummeret
 			AND sager2.Sagsnummer NOT LIKE '%skabelon%'
-
-			-- frav�lg sager hvor titlen indikerer at det er en testsag
+			AND sager2.Sagsnummer NOT LIKE '%S2023-24573%'
+			AND sager2.Titel NOT LIKE '%Meddelelser om arrangementer 2023%'
 			AND sager2.Titel NOT LIKE 'TESTSAG%'
 			AND sager2.Titel NOT LIKE 'TEST -%'
 			AND sager2.Titel NOT LIKE 'TEST %'
 			AND sager2.Titel NOT LIKE 'TEST,%'
-
-			-- frav�lg sager hvor titlen indeholder "lokalplan x"
 			AND sager2.Titel NOT LIKE 'Lokalplan X%'
-
-			-- frav�lg sager hvor titlen indeholder ordet "husnummerering"
 			AND sager2.Titel NOT LIKE '%Husnummerering%'
-
-			-- frav�lg sager hvor titlen indeholder ordet "filarkiv"
 			AND sager2.Titel NOT LIKE '%filarkiv%'
-
-			-- frav�lg sager hvor titlen indeholder ordet "aktindsigt"
 			AND sager2.Titel NOT LIKE '%aktindsigt%'
-
-			-- frav�lg KMD testsager
 			AND sager2.Titel not in ('Kims (KMD) testsag','(TEST KMD) test kmd','KMD test (Katrine)','KMD Test (Kim)')
-
-			-- frav�lg alle sager der starter med "BBR"
 			AND sager2.Titel NOT LIKE 'BBR%'
-
-			-- frav�lg opgaver hvor afslutningsdato og fristdato er sat
 			and (opgaver.Afsluttetdato is null and opgaver.Fristdato is null)
-
-			-- frav�lg sagsbehandler Hanne Eline Povlsen
 			AND sager2.Sagsbehandler_brugernavn <> 'Hanne Eline Povlsen'
 
-			-- frav�lg BBR-sager i sagsart
-			AND info2.Sagsart NOT LIKE 'BBR%'
-
-			-- frav�lg opgaver hvor startdato er sat og hvor afslutningsdato samtidig ikke er sat
-			and sager2.SagsUUID not in (
-				select
-					sager3.SagsUUID
-				from
-					Service_NOVA2.LIS_Byg_sager sager3
-					left join Service_NOVA2.LIS_Byg_Opgaver opgaver2 on sager3.SagsUUID = opgaver2.SagsUUID
-				where
-					opgaver2.Startdato is not null
-					and opgaver2.Afsluttetdato is null
-			)
-
-			-- frav�lg opgaver hvor opgavens status er "S" og hvor opgavens titel samtidig ikke starter med "tidsreg"
-			and sager2.SagsUUID NOT IN (
-				Select sager4.SagsUUID
-				FROM
-					LOIS.Service_NOVA2.LIS_Byg_sager sager4
-					INNER JOIN LOIS.Service_NOVA2.LIS_Byg_Opgaver opgaver3 On sager4.SagsUUID = opgaver3.SagsUUID
-				WHERE
-					opgaver3.[Status] = 'S'
-					AND opgaver3.Titel NOT LIKE 'Tidsreg%'
+			AND sager2.SagsUUID IN (
+				SELECT sager4.SagsUUID
+				FROM LOIS.Service_NOVA2.LIS_Byg_sager sager4
+				INNER JOIN LOIS.Service_NOVA2.LIS_Byg_Opgaver opgaver3 
+					ON sager4.SagsUUID = opgaver3.SagsUUID
+				WHERE opgaver3.[Status] = 'Igang' OR opgaver3.[Status] = 'I gang'
+				GROUP BY sager4.SagsUUID
+				HAVING COUNT(*) = SUM(CASE WHEN opgaver3.Titel LIKE '%Tidsreg%' THEN 1 ELSE 0 END)
 			)
 	)
 
