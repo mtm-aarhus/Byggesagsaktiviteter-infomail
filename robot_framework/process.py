@@ -100,10 +100,8 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
             <p>Her er excelarket med byggesager uden aktiviteter eller med tidsbegrænsede aktiviteter, samt excelarket med byggesager, der kun har tidsregistreringsaktiviteter. </p>
             <br>
             <p>Med venlig hilsen</p>
-            <br>
-            <p>Teknik og Miljø</p>
-            <p>Digitalisering</p>
-            <p>Aarhus Kommune</p>
+            <p>Laura</p>
+            <p>Teknik og Miljø, Digitalisering</p>
         </body>
     </html>
     """
