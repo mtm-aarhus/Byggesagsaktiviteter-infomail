@@ -97,8 +97,7 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
         <body>
             <p>Hej Pia og Louise 😊,</p>
             <br>
-            <p>Her er excelarket med byggesager uden aktiviteter eller med tidsbegrænsede aktiviteter,</p>
-            <p>samt excelarket med byggesager, der kun har tidsregistreringsaktiviteter. </p>
+            <p>Her er excelarket med byggesager uden aktiviteter eller med tidsbegrænsede aktiviteter, samt excelarket med byggesager, der kun har tidsregistreringsaktiviteter. </p>
             <br>
             <p>Med venlig hilsen</p>
             <br>
@@ -137,7 +136,7 @@ def process(orchestrator_connection: OrchestratorConnection| None = None) -> Non
     except Exception as e:
         orchestrator_connection.log_info(f"Fejl under vedhæftning af fil: {e}")
     try:
-        with open(excel_file_path_1, 'rb') as f:
+        with open(excel_file_path_2, 'rb') as f:
             file_data = f.read()
             file_name = os.path.basename(excel_file_path_2)
             mime_type, _ = mimetypes.guess_type(excel_file_path_2)
