@@ -16,13 +16,13 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 dependencies = [
-    "OpenOrchestrator == 3.*",
-    "Pillow == 10.*",
-    "requests == 2.32.*",
-    "pytz == 2024.2",
-    "pandas == 2.2.3",
-    "XlsxWriter == 3.2.*",
-    "openpyxl == 3.1.5"
+    "OpenOrchestrator==3.0.0",
+    "Pillow==10.4.0",
+    "requests==2.32.5",
+    "pytz==2024.2",
+    "pandas==2.2.3",
+    "XlsxWriter==3.2.9",
+    "openpyxl==3.1.5"
 ]
 
 
